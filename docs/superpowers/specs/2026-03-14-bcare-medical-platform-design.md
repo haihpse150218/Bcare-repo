@@ -11,7 +11,7 @@ A modern medical appointment booking platform connecting patients with doctors, 
 | Frontend | Next.js (App Router) + Tailwind CSS + shadcn/ui |
 | Backend API | Node.js + Fastify |
 | Database | Supabase PostgreSQL + Prisma ORM |
-| Realtime | Supabase Realtime (chat) + WebSocket (Fastify) |
+| Realtime | Fastify WebSocket (all realtime via backend) |
 | Video Call | Agora.io SDK |
 | Storage | Supabase Storage |
 | Payment | VNPay + Momo |
@@ -36,7 +36,6 @@ BACKEND API (Fastify on Railway/Render)
 DATA LAYER
   ├── Supabase PostgreSQL (Prisma ORM)
   ├── Supabase Storage (files, images)
-  ├── Supabase Realtime (chat subscriptions)
   ├── Redis/Upstash (sessions, cache, job queue)
   └── Agora SDK (video call - P2P)
 ```
@@ -73,10 +72,10 @@ bcare/
 - id, email, phone, password_hash, full_name, avatar_url, role (enum), is_verified, created_at, updated_at
 
 **doctors**
-- id, user_id (FK), clinic_id (FK), specialty_id (FK), title, bio, experience_years, consultation_fee, rating_avg, is_available
+- id, user_id (FK), clinic_id (FK), specialty_id (FK), slug (unique), title, bio, experience_years, consultation_fee, rating_avg, is_available, verification_status (enum)
 
 **clinics**
-- id, user_id (FK), name, address, district, city, lat, lng, phone, description, images[], operating_hours
+- id, user_id (FK), name, slug (unique), address, district, city, lat, lng, phone, description, images[], operating_hours, verification_status (enum)
 
 **specialties**
 - id, name, slug, icon, description
@@ -86,6 +85,11 @@ bcare/
 
 **appointments**
 - id, patient_id (FK), doctor_id (FK), clinic_id (FK), schedule_id (FK), date, time_slot, status (enum), symptom_note, payment_status, payment_method, amount, created_at
+- UNIQUE constraint on (doctor_id, date, time_slot) to prevent double-booking
+- Booking uses SELECT ... FOR UPDATE in transaction for concurrency safety
+
+**medical_records**
+- id, patient_id (FK), doctor_id (FK), appointment_id (FK), diagnosis, prescription, notes, attachments[], created_at, updated_at
 
 **reviews**
 - id, patient_id (FK), doctor_id (FK), appointment_id (FK), rating (1-5), comment, created_at
@@ -94,7 +98,7 @@ bcare/
 - id, appointment_id (FK), amount, method (enum), transaction_id, status (enum), paid_at
 
 **conversations**
-- id, appointment_id (FK), created_at
+- id, appointment_id (FK, nullable), patient_id (FK), doctor_id (FK), created_at
 
 **messages**
 - id, conversation_id (FK), sender_id (FK), content, type (enum), file_url, created_at
@@ -106,7 +110,19 @@ bcare/
 - id, user_id (FK), clinic_id (FK), position, permissions[]
 
 **blog_posts**
-- id, author_id (FK), title, slug, content, thumbnail_url, category, is_published, created_at
+- id, author_id (FK), title, slug, content, thumbnail_url, category_id (FK), meta_description, meta_image, is_published, created_at, updated_at
+
+**blog_categories**
+- id, name, slug
+
+**blog_tags**
+- id, name, slug
+
+**blog_post_tags** (many-to-many)
+- post_id (FK), tag_id (FK)
+
+**audit_logs**
+- id, user_id (FK), action, resource_type, resource_id, ip_address, metadata (jsonb), created_at
 
 ### Enums
 
@@ -115,6 +131,7 @@ bcare/
 - `payment_status`: UNPAID, PAID, REFUNDED
 - `payment_method`: VNPAY, MOMO, CASH
 - `message_type`: TEXT, IMAGE, FILE, VIDEO_CALL
+- `verification_status`: PENDING, VERIFIED, REJECTED
 
 ## API Endpoints
 
@@ -152,10 +169,13 @@ PATCH  /api/appointments/:id
 ### Payment
 ```
 POST   /api/payments/vnpay/create
-GET    /api/payments/vnpay/callback
+GET    /api/payments/vnpay/return      # User redirect back
+GET    /api/payments/vnpay/ipn         # Server-to-server IPN
 POST   /api/payments/momo/create
-GET    /api/payments/momo/callback
+POST   /api/payments/momo/ipn          # Momo IPN (POST)
+GET    /api/payments/momo/return       # User redirect back
 GET    /api/payments/:id
+POST   /api/payments/:id/refund        # Refund flow
 ```
 
 ### Chat & Telemedicine
@@ -184,6 +204,14 @@ PATCH  /api/posts/:id
 DELETE /api/posts/:id
 ```
 
+### Medical Records
+```
+GET    /api/medical-records            # Patient's records
+POST   /api/medical-records            # Doctor creates record
+GET    /api/medical-records/:id
+PATCH  /api/medical-records/:id
+```
+
 ### Admin
 ```
 GET    /api/admin/dashboard
@@ -192,12 +220,23 @@ PATCH  /api/admin/users/:id
 GET    /api/admin/appointments
 GET    /api/admin/payments
 GET    /api/admin/reports
+GET    /api/admin/specialties
+POST   /api/admin/specialties
+PATCH  /api/admin/specialties/:id
+DELETE /api/admin/specialties/:id
+GET    /api/admin/settings
+PATCH  /api/admin/settings
+PATCH  /api/admin/doctors/:id/verify   # Verify doctor
+PATCH  /api/admin/clinics/:id/verify   # Verify clinic
 ```
 
 ### Doctor/Clinic Dashboard
 ```
 PUT    /api/doctors/profile
-PUT    /api/doctors/schedules
+GET    /api/doctors/patients            # Doctor's patient list
+POST   /api/doctors/schedules           # Create schedule entry
+PUT    /api/doctors/schedules/:id       # Update schedule entry
+DELETE /api/doctors/schedules/:id       # Delete schedule entry
 PUT    /api/clinics/profile
 POST   /api/clinics/staff
 DELETE /api/clinics/staff/:id
@@ -209,11 +248,17 @@ POST   /api/upload/image
 POST   /api/upload/file
 ```
 
+### Query Parameters (all list endpoints)
+- `page` (default: 1), `limit` (default: 20, max: 100)
+- `sort` (field name), `order` (asc/desc)
+- Endpoint-specific filters: `specialty`, `city`, `status`, `date_from`, `date_to`
+
 ### Middleware
 - `authenticate` — Verify JWT token
 - `authorize(roles[])` — Role-based access control
-- `rateLimit` — Request rate limiting
+- `rateLimit` — Auth: 5 req/min per IP; Booking: 10 req/min per user; General: 100 req/min per user
 - `validate(schema)` — Input validation with Zod
+- `auditLog` — Log PHI access to audit_logs table
 
 ## Frontend Pages
 
@@ -305,14 +350,41 @@ Danger:      #DC2626  (errors, cancel)
 - No complex gradients — flat and clean
 - Mobile-first responsive design
 
+## Compliance & Data Protection
+
+- **Vietnamese Data Law**: Comply with Decree 13/2023/ND-CP on personal data protection
+- **Supabase Region**: Southeast Asia (Singapore) for data residency compliance
+- **Encryption**: All data encrypted at rest (Supabase default) + TLS in transit
+- **Audit Logging**: All PHI access logged to `audit_logs` table (who accessed what, when, from where)
+- **Consent Management**: Users must consent to data collection during registration
+- **Data Retention**: Medical records retained per Vietnamese healthcare law; users can request data export/deletion for non-medical data
+- **Password Security**: bcrypt hashing with salt rounds >= 12
+
+## Cancellation & Refund Policy
+
+- **Patient cancels > 24h before**: Full refund
+- **Patient cancels 2-24h before**: 50% refund
+- **Patient cancels < 2h before**: No refund
+- **Doctor/Clinic cancels**: Always full refund
+- **Refund flow**: PATCH appointment status to CANCELLED → system checks policy → auto-creates refund via VNPay/Momo API → updates payment_status to REFUNDED
+- **Cash payments**: No refund processing needed
+
+## i18n Strategy
+
+- Primary language: Vietnamese (vi)
+- Secondary language: English (en) — future phase
+- Library: `next-intl` for frontend
+- Date/time: Vietnamese locale formatting (dd/MM/yyyy, HH:mm)
+- Currency: VND formatting (e.g., 500.000 VND)
+- Backend API responses: language-agnostic (codes + data), frontend handles display text
+
 ## Realtime Features
 
 ### Chat
-- WebSocket connection via Fastify
-- Supabase Realtime for sync and presence
+- All WebSocket connections routed through Fastify backend (single realtime layer)
 - Messages persisted to PostgreSQL
 - File/image upload via Supabase Storage
-- Typing indicator + online status via Supabase Presence
+- Typing indicator + online status via WebSocket presence events
 
 ### Video Call (Agora)
 - Doctor initiates call → API generates Agora token
@@ -322,7 +394,7 @@ Danger:      #DC2626  (errors, cancel)
 - Call duration logged to appointment record
 
 ### Notifications
-- In-app: Supabase Realtime push
+- In-app: WebSocket push via Fastify
 - Email: Resend (appointment confirmation, reminders)
 - SMS: eSMS.vn (OTP, appointment reminders)
 - BullMQ job queue for async processing
@@ -480,3 +552,35 @@ bcare/
 ├── .env.example
 └── .gitignore
 ```
+
+## Error Handling Strategy
+
+### Backend API Response Format
+```json
+{
+  "success": true,
+  "data": {},
+  "meta": { "page": 1, "limit": 20, "total": 100 }
+}
+
+{
+  "success": false,
+  "error": { "code": "APPOINTMENT_SLOT_TAKEN", "message": "..." }
+}
+```
+
+### Frontend
+- React Error Boundaries for unexpected crashes
+- Toast notifications (sonner) for user-facing errors
+- Skeleton loading states for async content
+- Retry logic for transient network failures
+
+## State Management (Zustand)
+
+Zustand is used only for client-side state that cannot live in Server Components:
+- **Auth store**: current user, JWT token, login/logout
+- **Chat store**: active conversation, unread count, WebSocket connection
+- **Notification store**: unread notifications, WebSocket subscription
+- **UI store**: sidebar open/close, modal state
+
+All server data (doctors, appointments, etc.) is fetched via React Server Components or SWR/React Query — not stored in Zustand.
