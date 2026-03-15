@@ -7,6 +7,7 @@ import { DoctorProfile } from "@/components/doctors/doctor-profile";
 import { DoctorSchedule } from "@/components/doctors/doctor-schedule";
 import { DoctorReviews } from "@/components/doctors/doctor-reviews";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BookingModal } from "@/components/booking/booking-modal";
 
 export default function DoctorDetailPage() {
   const params = useParams();
@@ -41,6 +42,9 @@ export default function DoctorDetailPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
       <DoctorProfile doctor={doctor} />
+      <div className="max-w-xs">
+        <BookingModal doctorId={doctor.id} doctorName={`${doctor.title} ${doctor.user.fullName}`} />
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <DoctorSchedule doctorId={doctor.id} />
         <DoctorReviews doctorId={doctor.id} />

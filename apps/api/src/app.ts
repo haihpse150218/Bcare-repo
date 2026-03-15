@@ -6,6 +6,7 @@ import { authRoutes } from "./modules/auth/auth.routes";
 import { specialtiesRoutes } from "./modules/specialties/specialties.routes";
 import { doctorsRoutes } from "./modules/doctors/doctors.routes";
 import { clinicsRoutes } from "./modules/clinics/clinics.routes";
+import { appointmentsRoutes } from "./modules/appointments/appointments.routes";
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -35,6 +36,7 @@ export async function buildApp() {
   await app.register(specialtiesRoutes);
   await app.register(doctorsRoutes);
   await app.register(clinicsRoutes);
+  await app.register(appointmentsRoutes);
 
   return app;
 }
