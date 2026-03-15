@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import rateLimit from "@fastify/rate-limit";
+import { authRoutes } from "./modules/auth/auth.routes";
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -26,6 +27,8 @@ export async function buildApp() {
 
   // Health check
   app.get("/api/health", async () => ({ status: "ok" }));
+
+  await app.register(authRoutes);
 
   return app;
 }
