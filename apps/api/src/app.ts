@@ -3,6 +3,9 @@ import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import rateLimit from "@fastify/rate-limit";
 import { authRoutes } from "./modules/auth/auth.routes";
+import { specialtiesRoutes } from "./modules/specialties/specialties.routes";
+import { doctorsRoutes } from "./modules/doctors/doctors.routes";
+import { clinicsRoutes } from "./modules/clinics/clinics.routes";
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -29,6 +32,9 @@ export async function buildApp() {
   app.get("/api/health", async () => ({ status: "ok" }));
 
   await app.register(authRoutes);
+  await app.register(specialtiesRoutes);
+  await app.register(doctorsRoutes);
+  await app.register(clinicsRoutes);
 
   return app;
 }
