@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma";
 import { CreateAppointmentInput, UpdateAppointmentInput, ListAppointmentsInput } from "@bcare/shared";
+import { notify, scheduleReminder, cancelReminders } from "../../lib/notify";
 
 // Parse "YYYY-MM-DD" as local date to avoid timezone shift
 function parseLocalDate(dateStr: string): Date {
@@ -9,7 +10,7 @@ function parseLocalDate(dateStr: string): Date {
 
 export class AppointmentsService {
   async create(patientId: string, input: CreateAppointmentInput) {
-    return prisma.$transaction(async (tx: any) => {
+    const created = await prisma.$transaction(async (tx: any) => {
       const dateObj = parseLocalDate(input.date);
       const existing = await tx.$queryRaw<any[]>`
         SELECT id FROM appointments
@@ -37,11 +38,31 @@ export class AppointmentsService {
           amount: doctor.consultationFee,
         },
         include: {
-          doctor: { include: { user: { select: { fullName: true } }, specialty: true } },
+          doctor: { include: { user: { select: { id: true, fullName: true } }, specialty: true } },
           clinic: { select: { name: true, address: true } },
         },
       });
     });
+
+    // Notify doctor about new appointment
+    await notify({
+      userId: created.doctor.user.id,
+      type: "APPOINTMENT_CREATED",
+      title: "Lịch hẹn mới",
+      content: `Bệnh nhân đặt lịch hẹn ngày ${input.date} lúc ${input.timeSlot}`,
+      channels: ["IN_APP", "EMAIL"],
+    });
+
+    // Notify patient
+    await notify({
+      userId: patientId,
+      type: "APPOINTMENT_CREATED",
+      title: "Đặt lịch thành công",
+      content: `Lịch hẹn với ${created.doctor.user.fullName} ngày ${input.date} lúc ${input.timeSlot}`,
+      channels: ["IN_APP", "EMAIL"],
+    });
+
+    return created;
   }
 
   async findAll(where: any, input: ListAppointmentsInput) {
@@ -99,8 +120,41 @@ export class AppointmentsService {
       const cancelledBy = (cancelledByRole === "DOCTOR" || cancelledByRole === "STAFF") ? "DOCTOR" : "PATIENT";
       const { paymentsService } = await import("../payments/payments.service");
       await paymentsService.processRefund(id, cancelledBy as "PATIENT" | "DOCTOR");
-      const { cancelReminders } = await import("../../lib/notify");
       await cancelReminders(id);
+    }
+
+    if (status === "CONFIRMED") {
+      // Schedule reminders
+      const appointmentDate = new Date(result.date);
+      const [h, m] = result.timeSlot.split(":").map(Number);
+      appointmentDate.setHours(h, m, 0, 0);
+
+      await scheduleReminder(
+        id,
+        result.patientId,
+        result.doctor.user.fullName,
+        result.date.toISOString().split("T")[0],
+        result.timeSlot,
+        appointmentDate
+      );
+
+      await notify({
+        userId: result.patientId,
+        type: "APPOINTMENT_CONFIRMED",
+        title: "Lịch hẹn đã xác nhận",
+        content: `Lịch hẹn với ${result.doctor.user.fullName} đã được xác nhận`,
+        channels: ["IN_APP", "EMAIL", "SMS"],
+      });
+    }
+
+    if (status === "CANCELLED") {
+      await notify({
+        userId: result.patientId,
+        type: "APPOINTMENT_CANCELLED",
+        title: "Lịch hẹn đã hủy",
+        content: `Lịch hẹn đã bị hủy`,
+        channels: ["IN_APP", "EMAIL"],
+      });
     }
 
     return result;
