@@ -52,6 +52,19 @@ export class AuthService {
     if (!user) throw { code: "USER_NOT_FOUND", message: "Người dùng không tồn tại", status: 404 };
     return user;
   }
+
+  async updateProfile(userId: string, data: { fullName?: string; phone?: string }) {
+    const updateData: any = {};
+    if (data.fullName) updateData.fullName = data.fullName;
+    if (data.phone) updateData.phone = data.phone;
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: { id: true, email: true, phone: true, fullName: true, role: true, avatarUrl: true, isVerified: true },
+    });
+    return user;
+  }
 }
 
 export const authService = new AuthService();

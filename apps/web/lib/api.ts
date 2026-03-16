@@ -26,3 +26,27 @@ export async function api<T>(endpoint: string, options: ApiOptions = {}): Promis
 
   return json.data;
 }
+
+/** Fetch with meta (pagination) info */
+export async function apiWithMeta<T>(endpoint: string, options: ApiOptions = {}): Promise<{ data: T; meta?: { page: number; limit: number; total: number } }> {
+  const { token, ...fetchOptions } = options;
+
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...options.headers,
+  };
+
+  const res = await fetch(`${API_URL}${endpoint}`, {
+    ...fetchOptions,
+    headers,
+  });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error?.message || "Đã có lỗi xảy ra");
+  }
+
+  return { data: json.data, meta: json.meta };
+}

@@ -60,3 +60,19 @@ export async function meController(request: FastifyRequest, reply: FastifyReply)
     });
   }
 }
+
+export async function updateMeController(
+  request: FastifyRequest<{ Body: { fullName?: string; phone?: string } }>,
+  reply: FastifyReply
+) {
+  try {
+    const { id } = request.user as { id: string };
+    const user = await authService.updateProfile(id, request.body);
+    reply.send(success(user));
+  } catch (err: any) {
+    reply.status(err.status || 500).send({
+      success: false,
+      error: { code: err.code || "INTERNAL_ERROR", message: err.message },
+    });
+  }
+}
