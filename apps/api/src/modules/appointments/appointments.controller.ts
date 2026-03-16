@@ -72,7 +72,8 @@ export async function updateAppointmentController(
   reply: FastifyReply
 ) {
   try {
-    const appointment = await appointmentsService.updateStatus(request.params.id, request.body.status);
+    const { id: userId, role } = request.user as { id: string; role: string };
+    const appointment = await appointmentsService.updateStatus(request.params.id, request.body.status, role);
     reply.send(success(appointment));
   } catch (err: any) {
     reply.status(err.status || 500).send({

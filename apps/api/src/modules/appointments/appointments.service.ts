@@ -84,15 +84,26 @@ export class AppointmentsService {
     return appointment;
   }
 
-  async updateStatus(id: string, status: string) {
-    return prisma.appointment.update({
+  async updateStatus(id: string, status: string, cancelledByRole?: string) {
+    const result = await prisma.appointment.update({
       where: { id },
       data: { status: status as any },
       include: {
-        doctor: { include: { user: { select: { fullName: true } } } },
-        patient: { select: { fullName: true } },
+        doctor: { include: { user: { select: { id: true, fullName: true } } } },
+        patient: { select: { id: true, fullName: true } },
       },
     });
+
+    // Process refund on cancellation
+    if (status === "CANCELLED") {
+      const cancelledBy = (cancelledByRole === "DOCTOR" || cancelledByRole === "STAFF") ? "DOCTOR" : "PATIENT";
+      const { paymentsService } = await import("../payments/payments.service");
+      await paymentsService.processRefund(id, cancelledBy as "PATIENT" | "DOCTOR");
+      const { cancelReminders } = await import("../../lib/notify");
+      await cancelReminders(id);
+    }
+
+    return result;
   }
 }
 
