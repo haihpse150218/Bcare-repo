@@ -35,11 +35,11 @@ export default function AppointmentDetailPage() {
     if (!token) return;
     async function fetchData() {
       try {
-        const appt = await api<any>(`/api/appointments/${id}`, { token });
+        const appt = await api<any>(`/api/appointments/${id}`, { token: token! });
         setAppointment(appt);
         if (appt.status === "COMPLETED") {
           try {
-            const reviews = await api<any[]>("/api/reviews/my", { token });
+            const reviews = await api<any[]>("/api/reviews/my", { token: token! });
             const existing = reviews.find((r: any) => r.appointmentId === id);
             if (existing) setReview(existing);
           } catch {}

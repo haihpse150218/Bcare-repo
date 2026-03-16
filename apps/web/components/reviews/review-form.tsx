@@ -31,7 +31,7 @@ export function ReviewForm({ appointmentId, onSubmit }: ReviewFormProps) {
     try {
       const review = await api("/api/reviews", {
         method: "POST",
-        token,
+        token: token!,
         body: JSON.stringify({ appointmentId, rating, comment: comment || undefined }),
       });
       toast.success("Đánh giá thành công!");

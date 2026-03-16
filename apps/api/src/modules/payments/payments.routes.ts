@@ -28,6 +28,6 @@ export async function paymentsRoutes(app: FastifyInstance) {
   // MoMo IPN uses POST with body
   app.post("/api/payments/momo/ipn", momoIPNController);
 
-  app.get("/api/payments/history", { preHandler: [authenticate] }, paymentHistoryController);
+  app.get<{ Querystring: { page?: string; limit?: string } }>("/api/payments/history", { preHandler: [authenticate] }, paymentHistoryController);
   app.get<{ Params: { id: string } }>("/api/payments/:id", { preHandler: [authenticate] }, paymentDetailController);
 }

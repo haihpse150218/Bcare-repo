@@ -23,7 +23,7 @@ export function PaymentButton({ appointmentId, amount }: PaymentButtonProps) {
     try {
       const result = await api<{ paymentUrl: string }>(`/api/payments/${appointmentId}/create`, {
         method: "POST",
-        token,
+        token: token!,
         body: JSON.stringify({ method }),
       });
       window.location.href = result.paymentUrl;

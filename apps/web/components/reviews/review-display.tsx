@@ -36,7 +36,7 @@ export function ReviewDisplay({ review, onUpdate }: ReviewDisplayProps) {
     try {
       const updated = await api(`/api/reviews/${review.id}`, {
         method: "PUT",
-        token,
+        token: token!,
         body: JSON.stringify({ rating, comment: comment || undefined }),
       });
       toast.success("Cập nhật đánh giá thành công!");

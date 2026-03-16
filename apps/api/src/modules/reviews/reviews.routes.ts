@@ -3,19 +3,19 @@ import { createReviewController, updateReviewController, myReviewsController } f
 import { authenticate } from "../../middleware/authenticate";
 import { authorize } from "../../middleware/authorize";
 import { validate } from "../../middleware/validate";
-import { Role, createReviewSchema, updateReviewSchema } from "@bcare/shared";
+import { Role, createReviewSchema, updateReviewSchema, CreateReviewInput, UpdateReviewInput } from "@bcare/shared";
 
 export async function reviewsRoutes(app: FastifyInstance) {
-  app.post("/api/reviews", {
+  app.post<{ Body: CreateReviewInput }>("/api/reviews", {
     preHandler: [authenticate, authorize(Role.PATIENT), validate(createReviewSchema)],
     config: { rateLimit: { max: 5, timeWindow: "1 hour" } },
   }, createReviewController);
 
-  app.put<{ Params: { id: string } }>("/api/reviews/:id", {
+  app.put<{ Params: { id: string }; Body: UpdateReviewInput }>("/api/reviews/:id", {
     preHandler: [authenticate, authorize(Role.PATIENT), validate(updateReviewSchema)],
   }, updateReviewController);
 
-  app.get("/api/reviews/my", {
+  app.get<{ Querystring: { page?: string; limit?: string } }>("/api/reviews/my", {
     preHandler: [authenticate, authorize(Role.PATIENT)],
   }, myReviewsController);
 }

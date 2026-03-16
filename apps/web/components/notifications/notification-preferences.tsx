@@ -23,7 +23,7 @@ export function NotificationPreferences() {
 
   useEffect(() => {
     if (!token) return;
-    api<Prefs>("/api/notifications/preferences", { token })
+    api<Prefs>("/api/notifications/preferences", { token: token! })
       .then(setPrefs)
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -36,7 +36,7 @@ export function NotificationPreferences() {
     try {
       await api("/api/notifications/preferences", {
         method: "PUT",
-        token,
+        token: token!,
         body: JSON.stringify({ [key]: updated[key] }),
       });
       toast.success("Đã cập nhật");

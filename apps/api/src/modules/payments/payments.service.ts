@@ -28,7 +28,7 @@ export class PaymentsService {
             status: "PENDING" as any,
             transactionId: orderId,
             expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-            gatewayData: null,
+            gatewayData: undefined,
             refundAmount: null,
             refundedAt: null,
             refundReason: null,

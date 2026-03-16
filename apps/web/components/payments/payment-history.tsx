@@ -22,7 +22,7 @@ export function PaymentHistory() {
 
   useEffect(() => {
     if (!token) return;
-    api<any[]>("/api/payments/history", { token })
+    api<any[]>("/api/payments/history", { token: token! })
       .then(setPayments)
       .catch(() => {})
       .finally(() => setLoading(false));

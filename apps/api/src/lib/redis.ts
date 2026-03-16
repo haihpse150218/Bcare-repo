@@ -8,7 +8,7 @@ export function getRedisConnection(): IORedis {
       maxRetriesPerRequest: null,
     });
   }
-  return connection;
+  return connection!;
 }
 
 export async function closeRedisConnection(): Promise<void> {
