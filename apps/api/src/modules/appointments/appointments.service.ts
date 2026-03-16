@@ -1,13 +1,20 @@
 import { prisma } from "../../lib/prisma";
 import { CreateAppointmentInput, UpdateAppointmentInput, ListAppointmentsInput } from "@bcare/shared";
 
+// Parse "YYYY-MM-DD" as local date to avoid timezone shift
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 export class AppointmentsService {
   async create(patientId: string, input: CreateAppointmentInput) {
     return prisma.$transaction(async (tx: any) => {
+      const dateObj = parseLocalDate(input.date);
       const existing = await tx.$queryRaw<any[]>`
         SELECT id FROM appointments
         WHERE doctor_id = ${input.doctorId}
-          AND date = ${new Date(input.date)}::date
+          AND date = ${dateObj}::date
           AND time_slot = ${input.timeSlot}
           AND status != 'CANCELLED'
         FOR UPDATE
@@ -23,7 +30,7 @@ export class AppointmentsService {
           doctorId: input.doctorId,
           clinicId: doctor.clinicId,
           scheduleId: input.scheduleId,
-          date: new Date(input.date),
+          date: dateObj,
           timeSlot: input.timeSlot,
           symptomNote: input.symptomNote,
           paymentMethod: input.paymentMethod as any,

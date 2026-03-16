@@ -17,7 +17,9 @@ function generateTimeSlots(startTime: string, endTime: string, duration: number)
 
 export class SlotsService {
   async getAvailableSlots(doctorId: string, date: string) {
-    const dayOfWeek = new Date(date).getDay();
+    // Parse date as local to avoid timezone shift (e.g. "2026-03-16" → Monday)
+    const [y, m, d] = date.split("-").map(Number);
+    const dayOfWeek = new Date(y, m - 1, d).getDay();
     const schedule = await prisma.schedule.findFirst({
       where: { doctorId, dayOfWeek, isActive: true },
     });
@@ -28,7 +30,7 @@ export class SlotsService {
     const booked = await prisma.appointment.findMany({
       where: {
         doctorId,
-        date: new Date(date),
+        date: new Date(y, m - 1, d),
         status: { not: "CANCELLED" as any },
       },
       select: { timeSlot: true },

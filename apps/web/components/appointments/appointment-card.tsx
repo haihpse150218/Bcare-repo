@@ -45,7 +45,7 @@ export function AppointmentCard({ appointment, onCancel, showActions = true, lin
           <Avatar className="w-12 h-12">
             <AvatarImage src={appointment.doctor.user.avatarUrl || undefined} />
             <AvatarFallback className="bg-primary-50 text-primary">
-              {appointment.doctor.user.fullName.charAt(0)}
+              {appointment.doctor.user.fullName?.charAt(0) || "?"}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">

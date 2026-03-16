@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 
 const DAYS = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
@@ -49,7 +50,7 @@ export function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
       .finally(() => setLoading(false));
   }, [doctorId]);
 
-  if (loading) return null;
+  if (loading) return <Card><CardContent className="p-6"><Skeleton className="h-24 rounded" /></CardContent></Card>;
   if (schedules.length === 0) {
     return (
       <Card>

@@ -24,7 +24,7 @@ export function DoctorProfile({ doctor }: DoctorProfileProps) {
         <Avatar className="w-28 h-28 border-2 border-primary-50">
           <AvatarImage src={doctor.user.avatarUrl || undefined} alt={doctor.user.fullName} />
           <AvatarFallback className="bg-primary-50 text-primary text-2xl">
-            {doctor.user.fullName.charAt(0)}
+            {doctor.user.fullName?.charAt(0) || "?"}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">

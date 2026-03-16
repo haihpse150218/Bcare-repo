@@ -32,7 +32,13 @@ export function RegisterForm() {
       });
       setAuth(data.user, data.token, data.refreshToken);
       toast.success("Đăng ký thành công!");
-      router.push("/patient/dashboard");
+      const dashboardMap: Record<string, string> = {
+        PATIENT: "/patient/dashboard",
+        DOCTOR: "/doctor/dashboard",
+        STAFF: "/staff/dashboard",
+        ADMIN: "/admin/dashboard",
+      };
+      router.push(dashboardMap[data.user.role] || "/patient/dashboard");
     } catch (err: any) {
       toast.error(err.message);
     } finally {

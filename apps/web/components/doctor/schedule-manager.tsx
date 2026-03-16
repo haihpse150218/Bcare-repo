@@ -31,7 +31,7 @@ export function ScheduleManager() {
 
   useEffect(() => {
     if (!token) return;
-    api<Schedule[]>("/api/doctors/my-schedules", { token })
+    api<Schedule[]>("/api/my-schedules", { token })
       .then(setSchedules)
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -41,7 +41,7 @@ export function ScheduleManager() {
     if (!token) return;
     setAdding(true);
     try {
-      const schedule = await api<Schedule>("/api/doctors/schedules", {
+      const schedule = await api<Schedule>("/api/my-schedules", {
         method: "POST",
         token,
         body: JSON.stringify(newSchedule),
@@ -58,7 +58,7 @@ export function ScheduleManager() {
   async function handleDelete(id: string) {
     if (!token) return;
     try {
-      await api(`/api/doctors/schedules/${id}`, { method: "DELETE", token });
+      await api(`/api/my-schedules/${id}`, { method: "DELETE", token });
       setSchedules((prev) => prev.filter((s) => s.id !== id));
       toast.success("Đã xóa lịch");
     } catch (err: any) {

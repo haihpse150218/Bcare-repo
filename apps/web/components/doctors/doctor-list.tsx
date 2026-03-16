@@ -33,10 +33,13 @@ export function DoctorList() {
     params.set("limit", String(limit));
     if (!params.has("page")) params.set("page", "1");
 
-    api<any>(`/api/doctors?${params.toString()}`)
-      .then((data) => {
-        setDoctors(Array.isArray(data) ? data : []);
-        setTotal(0);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/api/doctors?${params.toString()}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success) {
+          setDoctors(Array.isArray(json.data) ? json.data : []);
+          setTotal(json.meta?.total || 0);
+        }
       })
       .catch(() => setDoctors([]))
       .finally(() => setLoading(false));

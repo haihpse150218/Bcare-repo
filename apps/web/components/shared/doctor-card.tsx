@@ -26,7 +26,7 @@ export function DoctorCard({ slug, name, title, avatarUrl, specialty, clinicName
         <Avatar className="w-20 h-20 mx-auto mb-3 border-2 border-primary-50">
           <AvatarImage src={avatarUrl || undefined} alt={name} />
           <AvatarFallback className="bg-primary-50 text-primary text-lg">
-            {name.charAt(0)}
+            {name?.charAt(0) || "?"}
           </AvatarFallback>
         </Avatar>
         <h3 className="font-semibold text-text">{title} {name}</h3>
