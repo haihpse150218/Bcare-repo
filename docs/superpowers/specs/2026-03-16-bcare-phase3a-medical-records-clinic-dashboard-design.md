@@ -11,6 +11,8 @@
 
 Phase 3A adds patient medical records (hybrid: appointment notes + patient health profile), clinic management dashboard with statistics/charts/export, and file attachments via Supabase Storage.
 
+**Note:** This spec supersedes the Phase 1 spec's `medical_records` table design (lines 91-92, 208-213). No `medical_records` table was created in prior phases. Phase 3A uses `MedicalNote` + `MedicalAttachment` instead.
+
 ## Decisions
 
 | Decision | Choice | Rationale |
@@ -65,6 +67,8 @@ model MedicalNote {
   patient      User               @relation("PatientMedicalNotes", fields: [patientId], references: [id])
   attachments  MedicalAttachment[]
 
+  @@index([patientId])
+  @@index([doctorId])
   @@map("medical_notes")
 }
 ```
@@ -83,6 +87,7 @@ model MedicalAttachment {
 
   note MedicalNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
 
+  // Attachments are immutable — upload or delete, never update
   @@map("medical_attachments")
 }
 ```
@@ -119,9 +124,9 @@ medicalNotes MedicalNote[]
 | POST | `/api/medical-notes` | Doctor | Create note for appointment |
 | PUT | `/api/medical-notes/:id` | Doctor (author) | Update note |
 | GET | `/api/medical-notes/appointment/:appointmentId` | Doctor, Patient (own) | View note by appointment |
-| GET | `/api/medical-notes/patient/:patientId` | Doctor (has appointment), Staff | Patient's note history |
-| GET | `/api/my-medical-notes` | Patient | View all own notes |
-| POST | `/api/medical-notes/:id/attachments` | Doctor (author) | Upload file attachment |
+| GET | `/api/medical-notes/patient/:patientId` | Doctor (has appointment), Staff | Patient's note history (paginated: `?page=1&limit=20`) |
+| GET | `/api/my-medical-notes` | Patient | View all own notes (paginated: `?page=1&limit=20`) |
+| POST | `/api/medical-notes/:id/attachments` | Doctor (author) | Upload file attachment (rate limit: 10/min) |
 | DELETE | `/api/medical-notes/:id/attachments/:attachmentId` | Doctor (author) | Delete attachment |
 
 ### Business Rules
@@ -131,6 +136,8 @@ medicalNotes MedicalNote[]
 3. **Doctor access to patient profile**: requires at least 1 non-CANCELLED appointment with that patient
 4. **File upload limits**: max 10MB per file, allowed types: image/jpeg, image/png, application/pdf, max 5 files per note
 5. **Patient access**: read-only for all notes and own profile; can update profile fields (bloodType, allergies, conditions, medications, notes)
+6. **Doctor ID resolution**: All "Doctor (author)" checks require resolving `request.user.id` (User ID) to `Doctor.id` via `prisma.doctor.findUnique({ where: { userId } })`. Create a reusable `getDoctorByUserId(userId)` helper in the medical-records service to avoid duplication across endpoints.
+7. **Audit logging**: All medical-records and patient-profile access MUST be logged to `audit_logs` table (action: "VIEW_MEDICAL_RECORD", "CREATE_MEDICAL_NOTE", "UPDATE_MEDICAL_NOTE", "VIEW_PATIENT_PROFILE", "UPDATE_PATIENT_PROFILE", "UPLOAD_ATTACHMENT", "DELETE_ATTACHMENT"). This is a compliance requirement for PHI data.
 
 ### Validation Schemas
 
@@ -182,7 +189,7 @@ const updatePatientProfileSchema = z.object({
 | GET | `/api/clinics/my/staff` | Clinic owner | List clinic staff |
 | POST | `/api/clinics/my/staff` | Clinic owner | Add staff member |
 | DELETE | `/api/clinics/my/staff/:staffId` | Clinic owner | Remove staff |
-| GET | `/api/clinics/my/stats` | Clinic owner, Staff | Summary statistics |
+| GET | `/api/clinics/my/stats` | Clinic owner, Staff | Summary statistics (optional `?from=&to=` date filter, default all-time) |
 | GET | `/api/clinics/my/stats/chart` | Clinic owner, Staff | Chart data (time series) |
 | GET | `/api/clinics/my/stats/export` | Clinic owner | Export CSV or PDF |
 
@@ -216,11 +223,11 @@ interface ChartData {
 
 ### Clinic Management Business Rules
 
-1. **Clinic owner** = User with role CLINIC who owns the clinic
+1. **Clinic owner** = User with role CLINIC who owns the clinic. If `/api/clinics/my` is called but no Clinic record exists for this user, return 404 with `CLINIC_NOT_FOUND`
 2. **Add doctor**: by email — user must exist with role DOCTOR and not belong to another clinic
 3. **Add staff**: by email — user must exist with role STAFF
-4. **Remove doctor/staff**: soft removal (set `clinicId` to null), don't delete user
-5. **Stats queries**: filter by clinic's appointments, aggregate revenue from appointment.amount where paymentStatus = PAID
+4. **Remove doctor**: soft removal (set `Doctor.clinicId` to null — already nullable). **Remove staff**: delete the `Staff` row (clinicId is non-nullable). Neither action deletes the `User` account.
+5. **Stats queries**: filter by clinic's appointments. Revenue = sum of `Payment.amount` where `Payment.status = PAID` (TransactionStatus enum), joined via `Appointment.payment`. For CASH appointments without a Payment record, use `Appointment.amount` where `Appointment.paymentStatus = PAID`.
 6. **Export date range**: default last 30 days, max 1 year
 
 ### Export Formats
