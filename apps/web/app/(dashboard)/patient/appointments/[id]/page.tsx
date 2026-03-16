@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Calendar, Clock, MapPin, User, Stethoscope } from "lucide-react";
 import { ReviewForm } from "@/components/reviews/review-form";
 import { ReviewDisplay } from "@/components/reviews/review-display";
+import { PaymentButton } from "@/components/payments/payment-button";
 
 const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   PENDING: { label: "Chờ xác nhận", variant: "outline" },
@@ -142,6 +143,11 @@ export default function AppointmentDetailPage() {
           )}
         </CardContent>
       </Card>
+      {appointment?.paymentStatus === "UNPAID" && appointment?.paymentMethod !== "CASH" && appointment?.status !== "CANCELLED" && (
+        <div className="mt-4">
+          <PaymentButton appointmentId={id} amount={appointment.amount || 0} />
+        </div>
+      )}
       {appointment?.status === "COMPLETED" && (
         <div className="mt-6">
           {review ? (
