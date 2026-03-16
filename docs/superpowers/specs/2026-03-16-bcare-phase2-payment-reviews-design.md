@@ -17,7 +17,7 @@ Phase 2 adds payment processing (VNPay + MoMo sandbox), doctor review system, an
 |----------|--------|-----------|
 | Payment gateway | VNPay + MoMo sandbox | Production-ready flow, switch to live keys later |
 | Payment flow | Booking first, pay later | Patient books → pays before appointment time |
-| Refund policy | Auto refund if cancelled ≥24h before appointment | Via gateway refund API |
+| Refund policy | 3-tier: full refund ≥24h, 50% 2-24h, none <2h; doctor cancels = full | Matches Phase 1 spec |
 | Review timing | Only after COMPLETED appointment | Ensures quality, prevents spam |
 | Review editing | Editable within 7 days, no delete | Balance between flexibility and integrity |
 | Notification channels | In-app + Email (Resend) + SMS (eSMS.vn) | Full coverage per spec |
@@ -32,37 +32,47 @@ Phase 2 adds payment processing (VNPay + MoMo sandbox), doctor review system, an
 
 ```prisma
 model Payment {
-  id            String        @id @default(cuid())
-  appointmentId String        @unique
+  id            String            @id @default(uuid())
+  appointmentId String            @unique
   userId        String
-  amount        Int           // VND
+  amount        Int               // VND
   method        PaymentMethod
-  status        PaymentStatus @default(PENDING)
-  transactionId String?       // Gateway transaction ID
-  gatewayData   Json?         // Raw gateway response
+  status        TransactionStatus @default(PENDING)
+  transactionId String?           // Gateway transaction ID
+  gatewayData   Json?             // Raw gateway response
+  refundAmount  Int?              // Refund amount (may differ from amount for partial refunds)
   refundedAt    DateTime?
   refundReason  String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  expiresAt     DateTime?         // PENDING payment expiry (15 min TTL)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
-  appointment   Appointment   @relation(fields: [appointmentId], references: [id])
-  user          User          @relation(fields: [userId], references: [id])
+  appointment   Appointment       @relation(fields: [appointmentId], references: [id])
+  user          User              @relation(fields: [userId], references: [id])
 
   @@map("payments")
 }
 ```
 
-### Modified: `PaymentStatus` enum
+### New: `TransactionStatus` enum
+
+Separate from `PaymentStatus` (used on Appointment) to avoid semantic conflict.
+`Appointment.paymentStatus` tracks whether the appointment is paid (UNPAID/PAID/REFUNDED).
+`Payment.status` tracks a specific transaction lifecycle (PENDING → PAID/FAILED/REFUNDED/EXPIRED).
 
 ```prisma
-enum PaymentStatus {
-  PENDING   // Payment created, awaiting gateway
-  UNPAID    // Not yet paid (appointment default)
-  PAID
-  REFUNDED
-  FAILED
+enum TransactionStatus {
+  PENDING   // Payment created, awaiting gateway response
+  PAID      // Gateway confirmed payment
+  FAILED    // Gateway rejected payment
+  REFUNDED  // Refund processed
+  EXPIRED   // PENDING payment timed out (15 min TTL)
 }
 ```
+
+### Payment Expiry
+
+PENDING payments expire after 15 minutes. A BullMQ delayed job is scheduled on payment creation. On expiry, `Payment.status` → EXPIRED, allowing the patient to retry.
 
 ### Modified: `Review` model
 
@@ -75,11 +85,22 @@ model Review {
 }
 ```
 
+### Modified: `Appointment` model
+
+Add `updatedAt` for tracking payment status changes:
+
+```prisma
+model Appointment {
+  // ... existing fields
+  updatedAt DateTime @updatedAt
+}
+```
+
 ### New: `NotificationPreference` model
 
 ```prisma
 model NotificationPreference {
-  id     String  @id @default(cuid())
+  id     String  @id @default(uuid())
   userId String  @unique
   email  Boolean @default(true)
   sms    Boolean @default(true)
@@ -91,6 +112,16 @@ model NotificationPreference {
 }
 ```
 
+### New: `NotificationChannel` enum
+
+```prisma
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+}
+```
+
 ### Modified: `Notification` model
 
 Add fields:
@@ -98,7 +129,7 @@ Add fields:
 ```prisma
 model Notification {
   // ... existing fields
-  channel String?   // "IN_APP", "EMAIL", "SMS"
+  channel NotificationChannel? @default(IN_APP)
   sentAt  DateTime?
 }
 ```
@@ -127,7 +158,7 @@ enum NotificationType {
 
 Add to `User` model:
 ```prisma
-payments                User[] // relation
+payments                Payment[]
 notificationPreference  NotificationPreference?
 ```
 
@@ -149,7 +180,7 @@ payment Payment?
 | GET | `/api/payments/momo/callback` | Public | MoMo return URL |
 | POST | `/api/payments/vnpay/ipn` | Public | VNPay IPN webhook (server-to-server) |
 | POST | `/api/payments/momo/ipn` | Public | MoMo IPN webhook |
-| GET | `/api/payments/history` | Patient | Payment history with pagination |
+| GET | `/api/payments/history` | Patient | Payment history with pagination. Response: `{ id, appointmentId, amount, method, status, refundAmount, createdAt, appointment: { date, timeSlot, doctor: { user: { fullName } } } }` |
 | GET | `/api/payments/:id` | Patient | Payment detail |
 | POST | `/api/payments/:id/refund` | System | Trigger refund (called internally on cancel) |
 
@@ -160,7 +191,7 @@ payment Payment?
 2. POST /api/payments/:appointmentId/create { method: "VNPAY" | "MOMO" }
 3. Server:
    a. Validate appointment belongs to patient, status not CANCELLED
-   b. Validate no existing PAID payment for this appointment
+   b. Validate no existing PAID/PENDING payment for this appointment (EXPIRED/FAILED allows retry)
    c. Create Payment record (status: PENDING)
    d. Call VNPay/MoMo sandbox API to create payment URL
    e. Return { paymentUrl: "https://sandbox.vnpay.vn/..." }
@@ -174,18 +205,31 @@ payment Payment?
    d. Enqueue notification job (in-app + email + SMS)
 ```
 
-### Refund Flow
+### Refund Flow (3-tier policy)
 
 ```
-1. Patient cancels appointment (appointment.date - now >= 24h)
+1. Patient cancels appointment
 2. System checks: Payment exists with status PAID?
-3. If yes:
-   a. Call gateway refund API (VNPay/MoMo)
-   b. Update Payment status → REFUNDED, set refundedAt
+3. Calculate hoursBeforeAppointment = (appointmentDateTime - now) / hours
+4. Determine refund tier:
+   a. >= 24h: full refund (100%)
+   b. 2-24h: partial refund (50%)
+   c. < 2h: no refund
+   d. Doctor/Clinic cancels: always full refund (100%)
+5. If refund amount > 0:
+   a. Call gateway refund API with calculated amount
+   b. Update Payment: status → REFUNDED, refundAmount, refundedAt
    c. Update Appointment paymentStatus → REFUNDED
-   d. Enqueue notification job
-4. If cancelling < 24h before appointment: no refund, notify patient
+   d. Enqueue notification job with refund details
+6. If no refund (< 2h): notify patient that no refund is available
 ```
+
+### CASH Payment Handling
+
+CASH appointments skip the online payment flow entirely:
+- "Thanh toán" button only appears for non-CASH appointments
+- CASH appointments: staff/doctor marks as PAID via `PATCH /api/appointments/:id` (existing endpoint)
+- No Payment record created for CASH — tracked only via `Appointment.paymentStatus`
 
 ### VNPay Sandbox Integration
 
@@ -243,6 +287,7 @@ const updateReviewSchema = z.object({
 3. **No delete**: reviews cannot be deleted
 4. **Rating update**: after create/edit, recalculate doctor.rating as average of all reviews
 5. **Notification**: on create, push notification to doctor via BullMQ
+6. **Rate limit**: max 5 reviews per hour per user (via existing @fastify/rate-limit)
 
 ### Frontend Components
 
@@ -308,15 +353,18 @@ interface ReminderJob {
 
 ### Reminder Scheduling
 
+Use deterministic job IDs based on appointmentId for easy cancellation (no DB storage needed):
+
 ```
 On appointment confirmed:
   1. Calculate delay_24h = appointmentDateTime - 24 hours - now
   2. Calculate delay_30m = appointmentDateTime - 30 minutes - now
-  3. Add delayed job to reminder queue with respective delays
-  4. Store BullMQ job IDs on appointment metadata for cancellation
+  3. Add delayed job: jobId = "reminder-24h-{appointmentId}", delay = delay_24h
+  4. Add delayed job: jobId = "reminder-30m-{appointmentId}", delay = delay_30m
+  5. Skip job if delay is negative (appointment is sooner than reminder window)
 
 On appointment cancelled:
-  1. Remove delayed reminder jobs by stored job IDs
+  1. Remove jobs by ID: "reminder-24h-{appointmentId}" and "reminder-30m-{appointmentId}"
 ```
 
 ### Notification Preferences
@@ -362,14 +410,35 @@ Redis connection: via `REDIS_URL` environment variable (default: `redis://localh
 
 ---
 
+## 5.1. Worker Lifecycle
+
+BullMQ worker runs **in-process** with Fastify for simplicity (Phase 2 scale doesn't warrant a separate service):
+
+```
+apps/api/src/workers/
+  ├── notification.worker.ts   → Processes notification queue
+  ├── reminder.worker.ts       → Processes reminder queue
+  └── index.ts                 → Starts all workers, exports for server.ts
+```
+
+- Workers start after Fastify server is ready (`app.listen` callback)
+- Graceful shutdown: on SIGTERM/SIGINT, close workers first (drain queues), then close Fastify
+- If scale requires it later, workers can be extracted to a separate Docker service with no code changes (just a different entrypoint)
+
+### Notification Deduplication
+
+Each notification event dispatches **separate jobs per channel** (one for IN_APP, one for EMAIL, one for SMS). This way retries on a failed email don't duplicate the in-app notification. Each job is independent.
+
+---
+
 ## 6. Frontend Pages & Components
 
 ### New Pages
 
 | Page | Description |
 |------|-------------|
-| `/patient/payments` | Payment history list |
-| `/payment/result` | Payment result page (success/failure after gateway redirect) |
+| `/patient/payments` | Payment history list (inside dashboard layout) |
+| `/payment/result` | Payment result page — standalone (no dashboard chrome), gateway redirects here. Shows success/failure status, amount, link back to appointment. On failure: shows retry button. |
 
 ### Modified Pages
 
