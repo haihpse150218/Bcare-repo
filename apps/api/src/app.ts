@@ -9,6 +9,7 @@ import { clinicsRoutes } from "./modules/clinics/clinics.routes";
 import { appointmentsRoutes } from "./modules/appointments/appointments.routes";
 import { notificationsRoutes } from "./modules/notifications/notifications.routes";
 import { schedulesRoutes } from "./modules/doctors/schedules.routes";
+import { reviewsRoutes } from "./modules/reviews/reviews.routes";
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -41,6 +42,7 @@ export async function buildApp() {
   await app.register(appointmentsRoutes);
   await app.register(notificationsRoutes);
   await app.register(schedulesRoutes);
+  await app.register(reviewsRoutes);
 
   return app;
 }
