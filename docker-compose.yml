@@ -16,6 +16,19 @@ services:
       timeout: 3s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: bcare-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   api:
     build:
       context: .
@@ -32,8 +45,11 @@ services:
       JWT_REFRESH_EXPIRES_IN: 7d
       PORT: "3001"
       WEB_URL: http://localhost:3000
+      REDIS_URL: redis://redis:6379
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   web:
@@ -52,3 +68,4 @@ services:
 
 volumes:
   pgdata:
+  redisdata:
