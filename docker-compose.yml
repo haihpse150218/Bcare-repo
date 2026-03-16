@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bcare-db
+    environment:
+      POSTGRES_USER: bcare
+      POSTGRES_PASSWORD: bcare_dev_2026
+      POSTGRES_DB: bcare
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bcare"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: bcare-api
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://bcare:bcare_dev_2026@postgres:5432/bcare
+      DIRECT_URL: postgresql://bcare:bcare_dev_2026@postgres:5432/bcare
+      JWT_SECRET: bcare-dev-jwt-secret-32chars-min!!
+      JWT_REFRESH_SECRET: bcare-dev-refresh-secret-32chars!!
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      PORT: "3001"
+      WEB_URL: http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3001
+    container_name: bcare-web
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

@@ -1,3 +1,10 @@
+// Load .env from monorepo root (skip if env already set, e.g. in Docker)
+if (!process.env.DATABASE_URL) {
+  const { config } = require("dotenv");
+  const { resolve } = require("path");
+  config({ path: resolve(__dirname, "../../../.env") });
+}
+
 import { buildApp } from "./app";
 
 async function start() {
