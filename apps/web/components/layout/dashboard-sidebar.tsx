@@ -13,6 +13,8 @@ import {
   Users,
   Star,
   FileText,
+  CreditCard,
+  Settings,
 } from "lucide-react";
 
 const NAV_BY_ROLE: Record<string, { label: string; href: string; icon: React.ReactNode }[]> = {
@@ -21,6 +23,8 @@ const NAV_BY_ROLE: Record<string, { label: string; href: string; icon: React.Rea
     { label: "Lịch hẹn", href: "/patient/appointments", icon: <Calendar className="w-5 h-5" /> },
     { label: "Thông báo", href: "/patient/notifications", icon: <Bell className="w-5 h-5" /> },
     { label: "Cá nhân", href: "/patient/profile", icon: <User className="w-5 h-5" /> },
+    { label: "Lịch sử thanh toán", href: "/patient/payments", icon: <CreditCard className="w-5 h-5" /> },
+    { label: "Cài đặt thông báo", href: "/settings/notifications", icon: <Settings className="w-5 h-5" /> },
   ],
   DOCTOR: [
     { label: "Dashboard", href: "/doctor/dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
