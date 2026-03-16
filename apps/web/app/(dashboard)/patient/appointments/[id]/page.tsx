@@ -11,6 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatVND } from "@/lib/utils";
 import { toast } from "sonner";
 import { Calendar, Clock, MapPin, User, Stethoscope } from "lucide-react";
+import { ReviewForm } from "@/components/reviews/review-form";
+import { ReviewDisplay } from "@/components/reviews/review-display";
 
 const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   PENDING: { label: "Chờ xác nhận", variant: "outline" },
@@ -24,15 +26,27 @@ export default function AppointmentDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const [appointment, setAppointment] = useState<any>(null);
+  const [review, setReview] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { token } = useAuthStore();
 
   useEffect(() => {
     if (!token) return;
-    api<any>(`/api/appointments/${id}`, { token })
-      .then(setAppointment)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    async function fetchData() {
+      try {
+        const appt = await api<any>(`/api/appointments/${id}`, { token });
+        setAppointment(appt);
+        if (appt.status === "COMPLETED") {
+          try {
+            const reviews = await api<any[]>("/api/reviews/my", { token });
+            const existing = reviews.find((r: any) => r.appointmentId === id);
+            if (existing) setReview(existing);
+          } catch {}
+        }
+      } catch {}
+      setLoading(false);
+    }
+    fetchData();
   }, [id, token]);
 
   async function handleCancel() {
@@ -128,6 +142,15 @@ export default function AppointmentDetailPage() {
           )}
         </CardContent>
       </Card>
+      {appointment?.status === "COMPLETED" && (
+        <div className="mt-6">
+          {review ? (
+            <ReviewDisplay review={review} onUpdate={(r) => setReview(r)} />
+          ) : (
+            <ReviewForm appointmentId={id} onSubmit={(r) => setReview(r)} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
