@@ -16,12 +16,19 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   CANCELLED: { label: "Đã hủy", variant: "destructive" },
 };
 
+const PAYMENT_STATUS: Record<string, { label: string; className: string }> = {
+  UNPAID: { label: "Chưa thanh toán", className: "bg-orange-100 text-orange-700" },
+  PAID: { label: "Đã thanh toán", className: "bg-green-100 text-green-700" },
+  REFUNDED: { label: "Đã hoàn tiền", className: "bg-blue-100 text-blue-700" },
+};
+
 interface AppointmentCardProps {
   appointment: {
     id: string;
     date: string;
     timeSlot: string;
     status: string;
+    paymentStatus?: string;
     amount: number | null;
     doctor: {
       user: { fullName: string; avatarUrl: string | null };
@@ -52,6 +59,11 @@ export function AppointmentCard({ appointment, onCancel, showActions = true, lin
             <div className="flex items-center justify-between gap-2">
               <h3 className="font-semibold truncate">{appointment.doctor.user.fullName}</h3>
               <Badge variant={status.variant}>{status.label}</Badge>
+              {appointment.paymentStatus && appointment.paymentStatus !== "UNPAID" && (
+                <span className={`text-xs px-2 py-0.5 rounded-full ${PAYMENT_STATUS[appointment.paymentStatus]?.className || ""}`}>
+                  {PAYMENT_STATUS[appointment.paymentStatus]?.label || appointment.paymentStatus}
+                </span>
+              )}
             </div>
             <p className="text-sm text-text-light">{appointment.doctor.specialty.name}</p>
             <div className="flex flex-wrap gap-3 mt-2 text-sm text-text-light">
@@ -68,6 +80,9 @@ export function AppointmentCard({ appointment, onCancel, showActions = true, lin
                   <MapPin className="w-3.5 h-3.5" />
                   {appointment.clinic.name}
                 </span>
+              )}
+              {appointment.amount && (
+                <span className="text-sm text-gray-500">{appointment.amount.toLocaleString("vi-VN")}đ</span>
               )}
             </div>
           </div>
