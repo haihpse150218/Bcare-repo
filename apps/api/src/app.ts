@@ -11,6 +11,8 @@ import { notificationsRoutes } from "./modules/notifications/notifications.route
 import { schedulesRoutes } from "./modules/doctors/schedules.routes";
 import { reviewsRoutes } from "./modules/reviews/reviews.routes";
 import { paymentsRoutes } from "./modules/payments/payments.routes";
+import { medicalRecordsRoutes } from "./modules/medical-records/medical-records.routes";
+import { clinicManagementRoutes } from "./modules/clinic-management/clinic-management.routes";
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -45,6 +47,8 @@ export async function buildApp() {
   await app.register(schedulesRoutes);
   await app.register(reviewsRoutes);
   await app.register(paymentsRoutes);
+  await app.register(medicalRecordsRoutes);
+  await app.register(clinicManagementRoutes);
 
   return app;
 }

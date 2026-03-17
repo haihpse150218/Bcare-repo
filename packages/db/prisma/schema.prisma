@@ -91,6 +91,8 @@ model User {
   auditLogs              AuditLog[]
   payments               Payment[]
   notificationPreference NotificationPreference?
+  patientProfile         PatientProfile?
+  medicalNotes           MedicalNote[]  @relation("PatientMedicalNotes")
 
   @@map("users")
 }
@@ -115,6 +117,7 @@ model Doctor {
   schedules    Schedule[]
   appointments Appointment[]
   reviews      Review[]
+  medicalNotes MedicalNote[]
 
   @@map("doctors")
 }
@@ -191,8 +194,9 @@ model Appointment {
   doctor   Doctor   @relation(fields: [doctorId], references: [id])
   clinic   Clinic?  @relation(fields: [clinicId], references: [id])
   schedule Schedule @relation(fields: [scheduleId], references: [id])
-  review   Review?
-  payment  Payment?
+  review      Review?
+  payment     Payment?
+  medicalNote MedicalNote?
 
   @@unique([doctorId, date, timeSlot])
   @@map("appointments")
@@ -291,4 +295,56 @@ model AuditLog {
   user User? @relation(fields: [userId], references: [id])
 
   @@map("audit_logs")
+}
+
+model PatientProfile {
+  id          String   @id @default(uuid())
+  patientId   String   @unique @map("patient_id")
+  bloodType   String?  @map("blood_type")
+  allergies   String[] @default([])
+  conditions  String[] @default([])
+  medications String[] @default([])
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  patient User @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("patient_profiles")
+}
+
+model MedicalNote {
+  id            String    @id @default(uuid())
+  appointmentId String    @unique @map("appointment_id")
+  doctorId      String    @map("doctor_id")
+  patientId     String    @map("patient_id")
+  diagnosis     String
+  prescription  String?
+  notes         String?
+  followUpDate  DateTime? @map("follow_up_date")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  appointment Appointment        @relation(fields: [appointmentId], references: [id])
+  doctor      Doctor             @relation(fields: [doctorId], references: [id])
+  patient     User               @relation("PatientMedicalNotes", fields: [patientId], references: [id])
+  attachments MedicalAttachment[]
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@map("medical_notes")
+}
+
+model MedicalAttachment {
+  id        String   @id @default(uuid())
+  noteId    String   @map("note_id")
+  fileName  String   @map("file_name")
+  fileUrl   String   @map("file_url")
+  fileType  String   @map("file_type")
+  fileSize  Int      @map("file_size")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  note MedicalNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@map("medical_attachments")
 }
