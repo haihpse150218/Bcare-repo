@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import rateLimit from "@fastify/rate-limit";
+import websocket from "@fastify/websocket";
 import { authRoutes } from "./modules/auth/auth.routes";
 import { specialtiesRoutes } from "./modules/specialties/specialties.routes";
 import { doctorsRoutes } from "./modules/doctors/doctors.routes";
@@ -13,6 +14,12 @@ import { reviewsRoutes } from "./modules/reviews/reviews.routes";
 import { paymentsRoutes } from "./modules/payments/payments.routes";
 import { medicalRecordsRoutes } from "./modules/medical-records/medical-records.routes";
 import { clinicManagementRoutes } from "./modules/clinic-management/clinic-management.routes";
+import { chatRoutes } from "./modules/chat/chat.routes";
+import { registerChatWebSocket } from "./modules/chat/chat.websocket";
+import { generateVideoTokenController } from "./modules/chat/video-call.controller";
+import { authenticate } from "./middleware/authenticate";
+import { authorize } from "./middleware/authorize";
+import { Role } from "@bcare/shared";
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -35,6 +42,8 @@ export async function buildApp() {
     timeWindow: "1 minute",
   });
 
+  await app.register(websocket);
+
   // Health check
   app.get("/api/health", async () => ({ status: "ok" }));
 
@@ -49,6 +58,15 @@ export async function buildApp() {
   await app.register(paymentsRoutes);
   await app.register(medicalRecordsRoutes);
   await app.register(clinicManagementRoutes);
+  await app.register(chatRoutes);
+
+  // WebSocket chat
+  await registerChatWebSocket(app);
+
+  // Video call token
+  app.post<{ Body: { conversationId: string } }>("/api/video-call/token", {
+    preHandler: [authenticate, authorize(Role.PATIENT, Role.DOCTOR)],
+  }, generateVideoTokenController);
 
   return app;
 }

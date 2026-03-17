@@ -56,6 +56,13 @@ enum NotificationChannel {
   SMS
 }
 
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  VIDEO_CALL
+}
+
 enum NotificationType {
   APPOINTMENT_CREATED
   APPOINTMENT_CONFIRMED
@@ -93,6 +100,8 @@ model User {
   notificationPreference NotificationPreference?
   patientProfile         PatientProfile?
   medicalNotes           MedicalNote[]  @relation("PatientMedicalNotes")
+  patientConversations   Conversation[] @relation("PatientConversations")
+  sentMessages           Message[]      @relation("SentMessages")
 
   @@map("users")
 }
@@ -117,7 +126,8 @@ model Doctor {
   schedules    Schedule[]
   appointments Appointment[]
   reviews      Review[]
-  medicalNotes MedicalNote[]
+  medicalNotes  MedicalNote[]
+  conversations Conversation[]
 
   @@map("doctors")
 }
@@ -347,4 +357,37 @@ model MedicalAttachment {
   note MedicalNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
 
   @@map("medical_attachments")
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  patientId String   @map("patient_id")
+  doctorId  String   @map("doctor_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  patient  User      @relation("PatientConversations", fields: [patientId], references: [id])
+  doctor   Doctor    @relation(fields: [doctorId], references: [id])
+  messages Message[]
+
+  @@unique([patientId, doctorId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String      @id @default(uuid())
+  conversationId String      @map("conversation_id")
+  senderId       String      @map("sender_id")
+  content        String
+  type           MessageType @default(TEXT)
+  fileUrl        String?     @map("file_url")
+  fileName       String?     @map("file_name")
+  fileSize       Int?        @map("file_size")
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("SentMessages", fields: [senderId], references: [id])
+
+  @@index([conversationId])
+  @@map("messages")
 }

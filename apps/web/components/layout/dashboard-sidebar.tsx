@@ -20,6 +20,7 @@ import {
   Building,
   UserPlus,
   FileDown,
+  MessageCircle,
 } from "lucide-react";
 
 const NAV_BY_ROLE: Record<string, { label: string; href: string; icon: React.ReactNode }[]> = {
@@ -29,6 +30,7 @@ const NAV_BY_ROLE: Record<string, { label: string; href: string; icon: React.Rea
     { label: "Thông báo", href: "/patient/notifications", icon: <Bell className="w-5 h-5" /> },
     { label: "Cá nhân", href: "/patient/profile", icon: <User className="w-5 h-5" /> },
     { label: "Hồ sơ bệnh án", href: "/patient/medical-records", icon: <FileText className="w-5 h-5" /> },
+    { label: "Tin nhắn", href: "/patient/messages", icon: <MessageCircle className="w-5 h-5" /> },
     { label: "Thông tin sức khỏe", href: "/patient/profile/medical", icon: <Heart className="w-5 h-5" /> },
     { label: "Lịch sử thanh toán", href: "/patient/payments", icon: <CreditCard className="w-5 h-5" /> },
     { label: "Cài đặt thông báo", href: "/settings/notifications", icon: <Settings className="w-5 h-5" /> },
@@ -37,6 +39,7 @@ const NAV_BY_ROLE: Record<string, { label: string; href: string; icon: React.Rea
     { label: "Dashboard", href: "/doctor/dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
     { label: "Lịch hẹn", href: "/doctor/appointments", icon: <Calendar className="w-5 h-5" /> },
     { label: "Lịch làm việc", href: "/doctor/schedule", icon: <Clock className="w-5 h-5" /> },
+    { label: "Tin nhắn", href: "/doctor/messages", icon: <MessageCircle className="w-5 h-5" /> },
     { label: "Đánh giá", href: "/doctor/reviews", icon: <Star className="w-5 h-5" /> },
     { label: "Hồ sơ", href: "/doctor/profile", icon: <FileText className="w-5 h-5" /> },
   ],
