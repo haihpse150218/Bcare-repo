@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
 import jwt from "@fastify/jwt";
 import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
@@ -30,6 +31,10 @@ export async function buildApp() {
   await app.register(cors, {
     origin: process.env.WEB_URL || "http://localhost:3000",
     credentials: true,
+  });
+
+  await app.register(helmet, {
+    contentSecurityPolicy: false, // CSP managed by Next.js
   });
 
   await app.register(jwt, {
