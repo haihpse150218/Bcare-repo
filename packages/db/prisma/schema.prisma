@@ -102,6 +102,7 @@ model User {
   medicalNotes           MedicalNote[]  @relation("PatientMedicalNotes")
   patientConversations   Conversation[] @relation("PatientConversations")
   sentMessages           Message[]      @relation("SentMessages")
+  blogPosts              BlogPost[]
 
   @@map("users")
 }
@@ -390,4 +391,56 @@ model Message {
 
   @@index([conversationId])
   @@map("messages")
+}
+
+model BlogCategory {
+  id    String @id @default(uuid())
+  name  String
+  slug  String @unique
+
+  posts BlogPost[]
+
+  @@map("blog_categories")
+}
+
+model BlogTag {
+  id    String @id @default(uuid())
+  name  String
+  slug  String @unique
+
+  posts BlogPostTag[]
+
+  @@map("blog_tags")
+}
+
+model BlogPost {
+  id              String    @id @default(uuid())
+  authorId        String    @map("author_id")
+  title           String
+  slug            String    @unique
+  content         String
+  thumbnailUrl    String?   @map("thumbnail_url")
+  categoryId      String?   @map("category_id")
+  metaDescription String?   @map("meta_description")
+  metaImage       String?   @map("meta_image")
+  isPublished     Boolean   @default(false) @map("is_published")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  author   User          @relation(fields: [authorId], references: [id])
+  category BlogCategory? @relation(fields: [categoryId], references: [id])
+  tags     BlogPostTag[]
+
+  @@map("blog_posts")
+}
+
+model BlogPostTag {
+  postId String @map("post_id")
+  tagId  String @map("tag_id")
+
+  post BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  BlogTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@map("blog_post_tags")
 }

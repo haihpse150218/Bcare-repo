@@ -21,6 +21,9 @@ import {
   UserPlus,
   FileDown,
   MessageCircle,
+  Shield,
+  Newspaper,
+  Stethoscope,
 } from "lucide-react";
 
 const NAV_BY_ROLE: Record<string, { label: string; href: string; icon: React.ReactNode }[]> = {
@@ -57,6 +60,9 @@ const NAV_BY_ROLE: Record<string, { label: string; href: string; icon: React.Rea
   ],
   ADMIN: [
     { label: "Dashboard", href: "/admin/dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { label: "Người dùng", href: "/admin/users", icon: <Users className="w-5 h-5" /> },
+    { label: "Chuyên khoa", href: "/admin/specialties", icon: <Stethoscope className="w-5 h-5" /> },
+    { label: "Blog", href: "/admin/blog", icon: <Newspaper className="w-5 h-5" /> },
   ],
 };
 

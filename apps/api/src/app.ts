@@ -17,6 +17,8 @@ import { clinicManagementRoutes } from "./modules/clinic-management/clinic-manag
 import { chatRoutes } from "./modules/chat/chat.routes";
 import { registerChatWebSocket } from "./modules/chat/chat.websocket";
 import { generateVideoTokenController } from "./modules/chat/video-call.controller";
+import { blogRoutes } from "./modules/blog/blog.routes";
+import { adminRoutes } from "./modules/admin/admin.routes";
 import { authenticate } from "./middleware/authenticate";
 import { authorize } from "./middleware/authorize";
 import { Role } from "@bcare/shared";
@@ -59,6 +61,8 @@ export async function buildApp() {
   await app.register(medicalRecordsRoutes);
   await app.register(clinicManagementRoutes);
   await app.register(chatRoutes);
+  await app.register(blogRoutes);
+  await app.register(adminRoutes);
 
   // WebSocket chat
   await registerChatWebSocket(app);
