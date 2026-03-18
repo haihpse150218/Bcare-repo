@@ -23,8 +23,11 @@ import { adminRoutes } from "./modules/admin/admin.routes";
 import { authenticate } from "./middleware/authenticate";
 import { authorize } from "./middleware/authorize";
 import { Role } from "@bcare/shared";
+import { initSentry, Sentry } from "./lib/sentry.js";
 
 export async function buildApp() {
+  initSentry();
+
   const app = Fastify({ logger: true });
 
   // Plugins
@@ -76,6 +79,16 @@ export async function buildApp() {
   app.post<{ Body: { conversationId: string } }>("/api/video-call/token", {
     preHandler: [authenticate, authorize(Role.PATIENT, Role.DOCTOR)],
   }, generateVideoTokenController);
+
+  // Global error handler with Sentry
+  app.setErrorHandler((error, request, reply) => {
+    Sentry.captureException(error);
+    request.log.error(error);
+    reply.status(error.statusCode ?? 500).send({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: error.message },
+    });
+  });
 
   return app;
 }
