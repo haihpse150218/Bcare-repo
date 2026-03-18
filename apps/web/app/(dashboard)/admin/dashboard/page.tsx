@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuthStore } from "@/stores/auth.store";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
+import { RevenueChart } from "./revenue-chart";
 
 export default function AdminDashboardPage() {
   const { token } = useAuthStore();
@@ -44,6 +45,7 @@ export default function AdminDashboardPage() {
           </Card>
         ))}
       </div>
+      <RevenueChart />
       <div>
         <h2 className="text-lg font-semibold mb-3">Lịch hẹn gần đây</h2>
         <div className="space-y-2">
