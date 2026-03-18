@@ -11,8 +11,28 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "BCare - Đặt lịch khám bệnh trực tuyến",
-  description: "Nền tảng đặt lịch khám bệnh trực tuyến hàng đầu Việt Nam",
+  title: {
+    default: "BCare - Đặt lịch khám bệnh trực tuyến",
+    template: "%s | BCare",
+  },
+  description:
+    "Nền tảng đặt lịch khám bệnh trực tuyến hàng đầu Việt Nam. Tìm bác sĩ, phòng khám và đặt lịch hẹn dễ dàng.",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://bcare.vn"
+  ),
+  openGraph: {
+    type: "website",
+    locale: "vi_VN",
+    siteName: "BCare",
+    title: "BCare - Đặt lịch khám bệnh trực tuyến",
+    description: "Nền tảng đặt lịch khám bệnh trực tuyến hàng đầu Việt Nam",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "BCare - Đặt lịch khám bệnh trực tuyến",
+    description: "Nền tảng đặt lịch khám bệnh trực tuyến hàng đầu Việt Nam",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({

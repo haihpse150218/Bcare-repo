@@ -1,46 +1,46 @@
-"use client";
+import type { Metadata } from "next";
+import BlogPostContent from "./blog-post-content";
 
-import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import { api } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
-export default function BlogPostPage() {
-  const params = useParams();
-  const slug = params.slug as string;
-  const [post, setPost] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  try {
+    const res = await fetch(`${API_URL}/api/posts/${slug}`, {
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return {};
+    const json = await res.json();
+    const post = json.data;
+    return {
+      title: post.title,
+      description: post.metaDescription || post.content?.slice(0, 160),
+      openGraph: {
+        title: post.title,
+        description: post.metaDescription || post.content?.slice(0, 160),
+        type: "article",
+        publishedTime: post.createdAt,
+        modifiedTime: post.updatedAt,
+        images:
+          post.metaImage || post.thumbnailUrl
+            ? [{ url: post.metaImage || post.thumbnailUrl }]
+            : [],
+      },
+    };
+  } catch {
+    return {};
+  }
+}
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const data = await api<any>(`/api/posts/${slug}`);
-        setPost(data);
-      } catch { /* empty */ } finally { setLoading(false); }
-    }
-    load();
-  }, [slug]);
-
-  if (loading) return <div className="max-w-3xl mx-auto px-4 py-8"><div className="h-8 bg-gray-100 rounded w-2/3 mb-4 animate-pulse" /><div className="h-64 bg-gray-100 rounded animate-pulse" /></div>;
-  if (!post) return <div className="max-w-3xl mx-auto px-4 py-8"><p>Bài viết không tồn tại.</p><Link href="/blog"><Button variant="outline" className="mt-4">Quay lại Blog</Button></Link></div>;
-
-  return (
-    <article className="max-w-3xl mx-auto px-4 py-8">
-      <Link href="/blog" className="text-sm text-primary hover:underline mb-4 inline-block">← Quay lại Blog</Link>
-      {post.thumbnailUrl && <img src={post.thumbnailUrl} alt={post.title} className="w-full h-64 object-cover rounded-lg mb-6" />}
-      <h1 className="text-3xl font-bold mb-2">{post.title}</h1>
-      <div className="flex items-center gap-3 text-sm text-muted-foreground mb-6">
-        <span>{post.author?.fullName}</span>
-        <span>·</span>
-        <span>{new Date(post.createdAt).toLocaleDateString("vi-VN")}</span>
-        {post.category && <Badge variant="outline">{post.category.name}</Badge>}
-      </div>
-      {post.tags?.length > 0 && (
-        <div className="flex gap-1 mb-6">{post.tags.map((t: any) => <Badge key={t.tag.slug} variant="secondary">{t.tag.name}</Badge>)}</div>
-      )}
-      <div className="prose max-w-none text-sm leading-relaxed whitespace-pre-wrap">{post.content}</div>
-    </article>
-  );
+export default async function BlogPostPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  return <BlogPostContent slug={slug} />;
 }
